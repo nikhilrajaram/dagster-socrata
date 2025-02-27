@@ -14,12 +14,12 @@ class SocrataResource(ConfigurableResource):
     def get_client(self) -> Socrata:
         client = Socrata(self.domain, self.app_token, timeout=self.timeout)
         try:
-            yield SocratClientWrapper(client)
+            yield SocrataClientWrapper(client)
         finally:
             client.close()
 
 
-class SocratClientWrapper:
+class SocrataClientWrapper:
     """Wrapper class for Socrata client with enhanced error handling"""
 
     def __init__(self, client: Socrata):
