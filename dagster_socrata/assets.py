@@ -1,53 +1,238 @@
+import io
 import json
-from io import BytesIO
-from logging import Logger
 from typing import Any, Dict, List
 
-import pyarrow
-import pyarrow.parquet as pq
+import pandas as pd
+import pyarrow as pa
+import pyarrow.dataset as ds
+import s3fs
 from botocore.exceptions import ClientError
-from dagster import AssetExecutionContext, Config, EnvVar, asset
+from dagster import AssetExecutionContext, Config, EnvVar
+from dagster import AssetIn, Output, asset
 from dagster_aws.s3 import S3Resource
+from deltalake import DeltaTable
+from deltalake import write_deltalake
 
 from dagster_socrata.resource import SocrataResource
 
 
+class SocrataMetadata:
+    def __init__(self, metadata: Dict[str, Any]):
+        self.metadata = metadata
+
+    def __getitem__(self, key):
+        # Allow accessing dictionary items using obj['key']
+        return self.metadata[key]
+
+    def save(self, s3_client, bucket_name, s3_path) -> str:
+        metadata_path = f"{s3_path.rstrip('/')}/metadata.json"
+        s3_client.put_object(Bucket=bucket_name,
+                             Key=metadata_path,
+                             Body=json.dumps(self.metadata))
+        return metadata_path
+
+    @classmethod
+    def read(cls, s3_client, bucket_name, metadata_path):
+        response = s3_client.get_object(Bucket=bucket_name, Key=metadata_path)
+        return cls(json.loads(response['Body'].read()))
+
+    @staticmethod
+    def infer_type(column: Dict[str, Any], schema_or_sql='sql'):
+        int_type = "INTEGER" if schema_or_sql == 'sql' else pa.int64()
+        float_type = "FLOAT" if schema_or_sql == 'sql' else pa.float64()
+        text_type = "VARCHAR" if schema_or_sql == 'sql' else pa.string()
+        date_type = "TIMESTAMP" if schema_or_sql == 'sql' else pa.timestamp('s')
+        bool_type = "BOOLEAN" if schema_or_sql == 'sql' else pa.bool_()
+
+        def all_items_are_integers(data):
+            if "top" not in data:
+                return False
+            try:
+                return all(int(entry["item"]) or True for entry in data["top"])
+            except (ValueError, KeyError):
+                return False
+
+        if column['dataTypeName'] == 'number':
+            if "cachedContents" in column:
+                return int_type\
+                    if all_items_are_integers(column["cachedContents"]) \
+                    else float_type
+            else:
+                return float_type
+        elif column['dataTypeName'] == 'text':
+            return text_type
+        elif column['dataTypeName'] == 'date':
+            return date_type
+        elif column['dataTypeName'] == 'boolean':
+            return bool_type
+        else:
+            return text_type
+
+    @property
+    def schema(self):
+        return pa.schema(
+            [(col['fieldName'], self.infer_type(col, "pa"))
+             for col in self.metadata['columns']])
+
+    @property
+    def casts(self):
+        casts = [f"CAST({col['fieldName']} AS {self.infer_type(col, 'sql')}) AS {col['fieldName']}"  # NOQA E501
+                 for col in self.metadata['columns']]
+        return ", ".join(casts)
+
+
 class SocrataDatasetConfig(Config):
     dataset_id: str = "vdgb-f9s3"
-    socrata_batch_size: int = 10000
-    parquet_chunk_size: int = int(1e6)
+    socrata_batch_size: int = 2000
 
 
 @asset(
-    compute_kind="socrata",
-    group_name="data_ingestion"
+    group_name="CDC"
 )
-def socrata_dataset(context: AssetExecutionContext,
-                    config: SocrataDatasetConfig,
-                    socrata: SocrataResource,
-                    s3: S3Resource) -> None:
-    """Asset that streams data from Socrata directly to S3"""
-    bucket_name = EnvVar("DEST_BUCKET").get_value()
-    context.log.info(f"Writing to {bucket_name}")
-
-    s3_key = f"parquet/{socrata.domain}/{config.dataset_id}"
-    delete_directory_in_s3(bucket_name, s3_key, s3)
-    s3_client = s3.get_client()
-
+def socrata_metadata(context: AssetExecutionContext,
+                     config: SocrataDatasetConfig,
+                     socrata: SocrataResource) -> SocrataMetadata:
+    """Asset that retrieves metadata from Socrata"""
     with socrata.get_client() as client:
-        metadata = client.get_metadata(config.dataset_id)
-        s3_client.put_object(Bucket=bucket_name,
-                             Key=f"{s3_key}/metadata.json",
-                             Body=json.dumps(metadata))
+        metadata_json = client.get_metadata(config.dataset_id)
+        context.log.info(f"Retrieved metadata for {config.dataset_id}")
+        return SocrataMetadata(metadata_json)
 
-        with JSONBatchS3Writer(bucket_name=bucket_name,
-                               prefix=s3_key,
-                               batch_size=config.parquet_chunk_size,
-                               log=context.log,
-                               s3=s3) as writer:
-            for json_records in client.get_dataset(
-                    config.dataset_id, limit=config.socrata_batch_size):
-                writer.add(json_records)
+
+@asset(
+    ins={"socrata_metadata": AssetIn()},
+    group_name="CDC",
+    description="Downloads Socrata dataset and writes it to an object store as CSV",
+)
+def socrata_to_object_store(context,
+                            socrata_metadata,
+                            socrata: SocrataResource,
+                            config: SocrataDatasetConfig,
+                            s3: S3Resource) -> Output:
+    """
+    Asset that downloads a Socrata dataset based on metadata and writes it to an object
+    store as CSV.
+
+    Args:
+        context: The Dagster execution context
+        socrata_metadata: Metadata from the socrata_metadata asset
+
+    Returns:
+        Information about the dataset stored in the object store
+    """
+    # Extract dataset information from metadata
+    dataset_id = socrata_metadata["id"]
+    stage_path = f"stage/{dataset_id}/"
+
+    # Log the operation
+    context.log.info(f"Processing Socrata dataset: {dataset_id}")
+    bucket_name = EnvVar("DEST_BUCKET").get_value()
+    s3_client = s3.get_client()
+    delete_directory_in_s3(bucket_name, stage_path, s3)
+
+    context.log.info("Saving metadata to " + stage_path)
+
+    # Access the SocrataResource and get the dataset
+    with socrata.get_client() as client:
+        part = 0
+        for data in client.get_dataset(dataset_id, limit=config.socrata_batch_size):
+            # Extract the headers (first row)
+            headers = data[0]
+
+            # Extract the data (remaining rows)
+            rows = data[1:]
+            df = pd.DataFrame(rows, columns=headers)
+            # Convert DataFrame to CSV
+            csv_buffer = io.StringIO()
+            df.to_csv(csv_buffer, index=False)
+            csv_data = csv_buffer.getvalue()
+            s3_key = f"stage/{dataset_id}/PART-{part:03d}.csv"
+
+            # Write the CSV to the object store
+            s3_client.put_object(Bucket=EnvVar("DEST_BUCKET").get_value(),
+                                 Key=s3_key,
+                                 Body=csv_data)
+
+            part += 1
+
+    # Return information about the stored dataset
+    return Output(
+        value={
+            "csv_path": stage_path,
+            "socrata_domain": socrata.domain,
+        },
+        metadata={
+            "dataset_id": dataset_id,
+            "license": socrata_metadata["licenseId"],
+        }
+    )
+
+
+class SocrataToDeltaLakeConfig(Config):
+    min_row_group_size: int = 0       # Sets min rows per row group
+    max_row_group_size: int = 100000  # Sets max rows per row group
+
+
+@asset(
+    ins={"socrata_metadata": AssetIn(),
+         "socrata_to_object_store": AssetIn()},
+    group_name="CDC",
+    description="Converts Socrata dataset to Delta Lake"
+)
+def socrata_to_deltalake(context: AssetExecutionContext,
+                         config: SocrataToDeltaLakeConfig,
+                         socrata_to_object_store: Dict[str, Any],
+                         socrata_metadata: SocrataMetadata,
+                         s3: S3Resource) -> Output:
+
+    bucket = EnvVar("DEST_BUCKET").get_value()
+    delta_table_path = f"s3://{bucket}/delta/{socrata_to_object_store['socrata_domain']}/{socrata_metadata['id']}"  # NOQA E501
+
+    storage_options = {"AWS_ACCESS_KEY_ID": s3.aws_access_key_id,
+                       "AWS_SECRET_ACCESS_KEY": s3.aws_secret_access_key,
+                       "AWS_ENDPOINT_URL": s3.endpoint_url}
+
+    fs = s3fs.S3FileSystem(key=s3.aws_access_key_id,
+                           secret=s3.aws_secret_access_key,
+                           endpoint_url=s3.endpoint_url)
+
+    # Create a list of s3fs paths to the CSV files downloaded
+    # from socrata
+    csv_files = [f"/{bucket}/{file}" for file in
+                 list_csv_files(bucket,
+                                socrata_to_object_store['csv_path'],
+                                s3)]
+
+    # Create a pyarrow dataset referencing all of our csv files
+    dataset = ds.dataset(csv_files, format="csv",
+                         filesystem=fs, exclude_invalid_files=True,
+                         schema=socrata_metadata.schema)
+
+    write_deltalake(delta_table_path, dataset,
+                    name=socrata_metadata['id'],
+                    description=socrata_metadata['name'],
+                    min_rows_per_group=config.min_row_group_size,
+                    max_rows_per_group=config.max_row_group_size,
+                    mode="overwrite",
+                    storage_options=storage_options,
+                    schema=socrata_metadata.schema)
+
+    delta_table = DeltaTable(delta_table_path, storage_options=storage_options)
+
+    # Optimize the table - this should create a checkpoint file
+    delta_table.create_checkpoint()
+    print(delta_table.file_uris())
+
+    return Output(
+        value={
+            "delta_table_path": delta_table_path
+        },
+        metadata={
+            "table_name": socrata_metadata['id'],
+            "table_description": socrata_metadata['name'],
+            "delta_table_path": delta_table_path
+        }
+    )
 
 
 def delete_directory_in_s3(bucket_name, directory_path, s3: S3Resource):
@@ -114,78 +299,25 @@ def delete_directory_in_s3(bucket_name, directory_path, s3: S3Resource):
         }
 
 
-class JSONBatchS3Writer:
-    """
-    A context manager that batches JSON documents and writes them to S3.
-    It collects documents until the batch size is reached, then writes to S3.
-    Any remaining documents are written when the context is exited.
-    """
+def list_csv_files(bucket_name, directory_path: str, s3: S3Resource) -> List[str]:
+    if not directory_path.endswith('/'):
+        directory_path += '/'
 
-    def __init__(self,
-                 bucket_name: str,
-                 prefix: str,
-                 batch_size: int = 5,
-                 log: Logger = None,
-                 s3: S3Resource = None):
-        """
-        Initialize the batch writer.
+    # Initialize S3 client
+    s3_client = s3.get_client()
 
-        Args:
-            bucket_name: The S3 bucket name
-            prefix: The S3 key prefix to use for the files
-            batch_size: Number of documents to batch before writing (default: 5)
-            s3: Dagster S3 Resource
-        """
-        self.bucket = bucket_name
-        self.prefix = prefix
-        self.batch_size = batch_size
-        self.batch: List[Dict[str, Any]] = []
-        self.batch_count = 0
-        self.s3 = s3.get_client()
-        self.log = log
+    try:
+        # List all objects in the directory
+        paginator = s3_client.get_paginator('list_objects_v2')
+        objects = []
 
-    def __enter__(self):
-        """Enter the context manager and return self."""
-        return self
+        # Use pagination to handle large directories
+        for page in paginator.paginate(Bucket=bucket_name, Prefix=directory_path):
+            if 'Contents' in page:
+                for obj in page['Contents']:
+                    if obj['Key'].endswith('.csv'):
+                        objects.append(obj['Key'])
+        return objects
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """
-        Exit the context manager, ensuring any remaining
-        documents in the batch are written to S3.
-        """
-        if self.batch:
-            self._write_batch()
-
-    def add(self, doc: List[Dict[str, Any]]) -> None:
-        """
-        Add a document to the batch. If the batch size is reached,
-        write the batch to S3.
-
-        Args:
-            doc: The JSON-serializable document to add
-        """
-        self.batch.extend(doc)
-
-        if len(self.batch) >= self.batch_size:
-            self._write_batch()
-
-    def _write_batch(self) -> None:
-        """Write the current batch of documents to S3."""
-        if not self.batch:
-            return
-
-        self.log.info(f"Writing batch {self.batch_count} of size {len(self.batch)} to S3")
-        table = pyarrow.Table.from_pylist(self.batch)
-        s3_key = f"{self.prefix}/part-{self.batch_count:03d}.parquet"
-        buffer = BytesIO()
-        pq.write_table(table, buffer, compression='snappy')
-        buffer.seek(0)
-
-        self.s3.upload_fileobj(
-            buffer,
-            self.bucket,
-            s3_key)
-
-        # Reset batch and increment batch counter
-        self.batch = []
-        self.batch_count += 1
+    except ClientError as e:
+        raise e
