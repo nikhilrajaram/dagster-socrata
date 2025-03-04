@@ -1,5 +1,6 @@
 import io
 import json
+from datetime import datetime
 from typing import Any, Dict, List
 
 import pandas as pd
@@ -13,6 +14,7 @@ from dagster_aws.s3 import S3Resource
 from deltalake import DeltaTable
 from deltalake import write_deltalake
 
+from dagster_socrata.airtable_resource import AirTableResource
 from dagster_socrata.resource import SocrataResource
 
 
@@ -80,10 +82,17 @@ class SocrataMetadata:
                  for col in self.metadata['columns']]
         return ", ".join(casts)
 
+    @property
+    def table_name(self):
+        return self.metadata['id'].replace("-", "_")
+
+    @property
+    def license(self):
+        return self.metadata.get('license', {}).get('name', 'Unknown')
+
 
 class SocrataDatasetConfig(Config):
     dataset_id: str = "vdgb-f9s3"
-    socrata_batch_size: int = 2000
 
 
 @asset(
@@ -99,6 +108,10 @@ def socrata_metadata(context: AssetExecutionContext,
         return SocrataMetadata(metadata_json)
 
 
+class SocrataAPIConfig(Config):
+    socrata_batch_size: int = 2000
+
+
 @asset(
     ins={"socrata_metadata": AssetIn()},
     group_name="CDC",
@@ -106,8 +119,8 @@ def socrata_metadata(context: AssetExecutionContext,
 )
 def socrata_to_object_store(context,
                             socrata_metadata,
+                            config: SocrataAPIConfig,
                             socrata: SocrataResource,
-                            config: SocrataDatasetConfig,
                             s3: S3Resource) -> Output:
     """
     Asset that downloads a Socrata dataset based on metadata and writes it to an object
@@ -131,6 +144,7 @@ def socrata_to_object_store(context,
     delete_directory_in_s3(bucket_name, stage_path, s3)
 
     context.log.info("Saving metadata to " + stage_path)
+    socrata_metadata.save(s3_client, bucket_name, stage_path)
 
     # Access the SocrataResource and get the dataset
     with socrata.get_client() as client:
@@ -163,7 +177,7 @@ def socrata_to_object_store(context,
         },
         metadata={
             "dataset_id": dataset_id,
-            "license": socrata_metadata["licenseId"],
+            "license": socrata_metadata.license,
         }
     )
 
@@ -209,7 +223,7 @@ def socrata_to_deltalake(context: AssetExecutionContext,
                          schema=socrata_metadata.schema)
 
     write_deltalake(delta_table_path, dataset,
-                    name=socrata_metadata['id'],
+                    name=socrata_metadata.table_name,
                     description=socrata_metadata['name'],
                     min_rows_per_group=config.min_row_group_size,
                     max_rows_per_group=config.max_row_group_size,
@@ -225,13 +239,49 @@ def socrata_to_deltalake(context: AssetExecutionContext,
 
     return Output(
         value={
-            "delta_table_path": delta_table_path
+            "delta_table_path": delta_table_path,
+            "table_name": socrata_metadata.table_name
         },
         metadata={
-            "table_name": socrata_metadata['id'],
+            "table_name": socrata_metadata.table_name,
             "table_description": socrata_metadata['name'],
             "delta_table_path": delta_table_path
         }
+    )
+
+
+class CatalogConfig(Config):
+    catalog: str = "PublicHealth"
+    schema: str = "sdoh"
+
+
+@asset(
+    group_name="CDC",
+    description="Create Entry in Data Catalog",
+    ins={"socrata_metadata": AssetIn(),
+         "socrata_to_deltalake": AssetIn()},
+)
+def create_entry_in_data_catalog(context: AssetExecutionContext,
+                                 config: CatalogConfig,
+                                 airtable: AirTableResource,
+                                 socrata_metadata, socrata_to_deltalake):
+    """
+    Create an entry in the data catalog for the dataset.
+    :param context:
+    :param config:
+    :param socrata_metadata:
+    :param socrata_to_deltalake:
+    :return:
+    """
+    airtable.create_table_record(
+        catalog=config.catalog,
+        schema=config.schema,
+        table=socrata_metadata.table_name,
+        name=socrata_metadata['name'],
+        description=socrata_metadata['description'],
+        deltalake_path=socrata_to_deltalake['delta_table_path'],
+        license=socrata_metadata.license,
+        pub_date=datetime.fromtimestamp(socrata_metadata['publicationDate'])
     )
 
 
