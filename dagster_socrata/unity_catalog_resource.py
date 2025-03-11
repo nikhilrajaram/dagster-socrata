@@ -7,6 +7,7 @@ from deltalake import DeltaTable
 
 class UnityCatalogResource(ConfigurableResource):
     """Dagster resource for interacting Unity Catalog API"""
+
     endpoint_url: str
     access_token: str = ""
 
@@ -60,7 +61,7 @@ class UnityCatalogResource(ConfigurableResource):
                     "type_precision": 0,
                     "type_scale": 0,
                     "nullable": True,
-                    "position": len(column_defs)
+                    "position": len(column_defs),
                 }
             )
 
@@ -80,20 +81,17 @@ class UnityCatalogResource(ConfigurableResource):
         """
         endpoint = f"{self.endpoint_url}/api/2.1/unity-catalog/tables/{catalog_name}.{schema_name}.{table_name}"  # NOQA E501
 
-        headers = {
-            "Content-Type": "application/json"
-        }
+        headers = {"Content-Type": "application/json"}
 
         if self.access_token:
-            headers.update({
-                "Authorization": f"Bearer {self.access_token}",
-            })
+            headers.update(
+                {
+                    "Authorization": f"Bearer {self.access_token}",
+                }
+            )
 
         # Make the DELETE request
-        response = requests.delete(
-            endpoint,
-            headers=headers
-        )
+        response = requests.delete(endpoint, headers=headers)
 
         if response.status_code == 200:
             return True
@@ -108,16 +106,16 @@ class UnityCatalogResource(ConfigurableResource):
         return True
 
     def create_unity_catalog_table(
-            self,
-            dt: DeltaTable,
-            name,
-            catalog_name,
-            schema_name,
-            table_type,
-            data_source_format,
-            storage_location,
-            comment=None,
-            properties=None
+        self,
+        dt: DeltaTable,
+        name,
+        catalog_name,
+        schema_name,
+        table_type,
+        data_source_format,
+        storage_location,
+        comment=None,
+        properties=None,
     ):
         """
         Create a table in Databricks Unity Catalog.
@@ -142,14 +140,14 @@ class UnityCatalogResource(ConfigurableResource):
         """
         endpoint = f"{self.endpoint_url}/api/2.1/unity-catalog/tables"
 
-        headers = {
-            "Content-Type": "application/json"
-        }
+        headers = {"Content-Type": "application/json"}
 
         if self.access_token:
-            headers.update({
-                "Authorization": f"Bearer {self.access_token}",
-            })
+            headers.update(
+                {
+                    "Authorization": f"Bearer {self.access_token}",
+                }
+            )
 
         cols = self.get_delta_table_columns_for_sql(dt)
 
@@ -161,7 +159,7 @@ class UnityCatalogResource(ConfigurableResource):
             "table_type": table_type,
             "data_source_format": data_source_format,
             "columns": cols,
-            "storage_location": storage_location
+            "storage_location": storage_location,
         }
 
         # Add optional parameters if provided
@@ -173,11 +171,7 @@ class UnityCatalogResource(ConfigurableResource):
 
         print(json.dumps(payload, indent=2))
         # Make the POST request
-        response = requests.post(
-            endpoint,
-            headers=headers,
-            data=json.dumps(payload)
-        )
+        response = requests.post(endpoint, headers=headers, data=json.dumps(payload))
 
         # Raise an exception if the request was unsuccessful
         response.raise_for_status()

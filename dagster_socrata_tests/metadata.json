@@ -1,0 +1,314 @@
+{
+  "id": "rkpp-igza",
+  "name": "Table of Gross Cigarette Tax Revenue Per State (Orzechowski and Walker Tax Burden on Tobacco)",
+  "assetType": "filter",
+  "attribution": "Centers for Disease Control and Prevention, National Center for Chronic Disease Prevention and Health Promotion, Office on Smoking and Health",
+  "attributionLink": "http://www.cdc.gov/tobacco/STATESystem",
+  "averageRating": 0,
+  "category": "Policy",
+  "createdAt": 1421095685,
+  "description": "1970-2019. Orzechowski and Walker. Tax Burden on Tobacco. Tax burden data was obtained from the annual compendium on tobacco revenue and industry statistics, The Tax Burden on Tobacco. Data are reported on an annual basis; Data include federal and state-level information regarding taxes applied to the price of a pack of cigarettes.",
+  "displayType": "table",
+  "downloadCount": 1416,
+  "hideFromCatalog": false,
+  "hideFromDataJson": false,
+  "licenseId": "ODC_BY",
+  "locked": false,
+  "modifyingViewUid": "7nwe-3aj9",
+  "newBackend": true,
+  "numberOfComments": 0,
+  "oid": 39771916,
+  "provenance": "official",
+  "publicationAppendEnabled": false,
+  "publicationDate": 1616406567,
+  "publicationGroup": 1595912,
+  "publicationStage": "published",
+  "queryString": "SELECT `locationabbr`, `locationdesc`, `year`, `datasource`, `topicdesc`, `measuredesc`, `data_value`, `data_value_unit`, `data_value_type`, `geolocation`, `source`, `topictypeid`, `topicid`, `measureid` WHERE starts_with(upper(`source`), \"TABLE 12\") ORDER BY `year` DESC NULL LAST,`locationdesc` ASC NULL LAST",
+  "rowsUpdatedAt": 1616406082,
+  "tableId": 19214629,
+  "totalTimesRated": 0,
+  "viewCount": 54502,
+  "viewLastModified": 1738281761,
+  "viewType": "tabular",
+  "approvals": [
+    {
+      "reviewedAt": 1421095685,
+      "reviewedAutomatically": true,
+      "state": "approved",
+      "submissionId": 5632529,
+      "submissionObject": "public_audience_request",
+      "submissionOutcome": "change_audience",
+      "submittedAt": 1421095685,
+      "targetAudience": "public",
+      "workflowId": 2100,
+      "submissionDetails": {
+        "permissionType": "READ"
+      },
+      "submissionOutcomeApplication": {
+        "failureCount": 0,
+        "status": "success"
+      },
+      "submitter": {
+        "id": "p5wh-zttj",
+        "displayName": "OSHData"
+      }
+    }
+  ],
+  "clientContext": {
+    "clientContextVariables": [],
+    "inheritedVariables": {}
+  },
+  "columns": [
+    {
+      "id": 578111924,
+      "name": "LocationAbbr",
+      "dataTypeName": "text",
+      "description": "Location abbreviation",
+      "fieldName": "locationabbr",
+      "position": 1,
+      "renderTypeName": "text",
+      "tableColumnId": 19953122,
+      "width": 106,
+      "format": {}
+    },
+    {
+      "id": 578111925,
+      "name": "LocationDesc",
+      "dataTypeName": "text",
+      "description": "Location description",
+      "fieldName": "locationdesc",
+      "position": 2,
+      "renderTypeName": "text",
+      "tableColumnId": 19953123,
+      "width": 108,
+      "format": {}
+    },
+    {
+      "id": 578111926,
+      "name": "Year",
+      "dataTypeName": "number",
+      "description": "Year",
+      "fieldName": "year",
+      "position": 3,
+      "renderTypeName": "number",
+      "tableColumnId": 19953124,
+      "width": 93,
+      "format": {
+        "precisionStyle": "standard",
+        "noCommas": "true",
+        "align": "left"
+      }
+    },
+    {
+      "id": 578111927,
+      "name": "Datasource",
+      "dataTypeName": "text",
+      "description": "Data source",
+      "fieldName": "datasource",
+      "position": 4,
+      "renderTypeName": "text",
+      "tableColumnId": 23864478,
+      "width": 100,
+      "format": {}
+    },
+    {
+      "id": 578111928,
+      "name": "TopicDesc",
+      "dataTypeName": "text",
+      "description": "Topic description",
+      "fieldName": "topicdesc",
+      "position": 5,
+      "renderTypeName": "text",
+      "tableColumnId": 19953125,
+      "width": 208,
+      "format": {}
+    },
+    {
+      "id": 578111929,
+      "name": "MeasureDesc",
+      "dataTypeName": "text",
+      "description": "Measure description",
+      "fieldName": "measuredesc",
+      "position": 6,
+      "renderTypeName": "text",
+      "tableColumnId": 19953126,
+      "width": 232,
+      "format": {}
+    },
+    {
+      "id": 578111931,
+      "name": "Data_Value",
+      "dataTypeName": "number",
+      "description": "Value of the data",
+      "fieldName": "data_value",
+      "position": 7,
+      "renderTypeName": "number",
+      "tableColumnId": 19953127,
+      "width": 160,
+      "format": {
+        "precisionStyle": "standard",
+        "noCommas": "false",
+        "align": "right"
+      }
+    },
+    {
+      "id": 578111932,
+      "name": "Data_Value_Unit",
+      "dataTypeName": "text",
+      "description": "Indicator of the type of data value ($, %, etc)",
+      "fieldName": "data_value_unit",
+      "position": 8,
+      "renderTypeName": "text",
+      "tableColumnId": 19953128,
+      "width": 85,
+      "format": {}
+    },
+    {
+      "id": 578111933,
+      "name": "Data_Value_Type",
+      "dataTypeName": "text",
+      "description": "Type of data (yes/no, percentage, dollar, etc)",
+      "fieldName": "data_value_type",
+      "position": 9,
+      "renderTypeName": "text",
+      "tableColumnId": 19953129,
+      "width": 105,
+      "format": {}
+    },
+    {
+      "id": 578111934,
+      "name": "GeoLocation",
+      "dataTypeName": "point",
+      "description": "Geo Location codes for mapping purposes",
+      "fieldName": "geolocation",
+      "position": 10,
+      "renderTypeName": "point",
+      "tableColumnId": 19953130,
+      "width": 232,
+      "format": {}
+    },
+    {
+      "id": 578111935,
+      "name": "Source",
+      "dataTypeName": "text",
+      "description": "Table source of data",
+      "fieldName": "source",
+      "position": 11,
+      "renderTypeName": "text",
+      "tableColumnId": 19953131,
+      "width": 172,
+      "format": {}
+    },
+    {
+      "id": 578111937,
+      "name": "TopicTypeId",
+      "dataTypeName": "text",
+      "description": "Topic type identifier code - can be used for filtering; used in application",
+      "fieldName": "topictypeid",
+      "position": 12,
+      "renderTypeName": "text",
+      "tableColumnId": 19953132,
+      "width": 232,
+      "format": {}
+    },
+    {
+      "id": 578111940,
+      "name": "TopicId",
+      "dataTypeName": "text",
+      "description": "Topic identifier - can be used for filtering",
+      "fieldName": "topicid",
+      "position": 13,
+      "renderTypeName": "text",
+      "tableColumnId": 19953133,
+      "width": 184,
+      "format": {}
+    },
+    {
+      "id": 578111942,
+      "name": "MeasureId",
+      "dataTypeName": "text",
+      "description": "Measure identifier - can be used for filtering",
+      "fieldName": "measureid",
+      "position": 14,
+      "renderTypeName": "text",
+      "tableColumnId": 19953134,
+      "width": 208,
+      "format": {}
+    }
+  ],
+  "grants": [
+    {
+      "inherited": false,
+      "type": "viewer",
+      "flags": [
+        "public"
+      ]
+    }
+  ],
+  "license": {
+    "name": "Open Data Commons Attribution License",
+    "termsLink": "http://opendatacommons.org/licenses/by/1.0/"
+  },
+  "metadata": {
+    "rdfSubject": "0",
+    "custom_fields": {
+      "Common Core": {
+        "Contact Email": "nccdoshinquiries@cdc.gov",
+        "Contact Name": "OSHData Support",
+        "Program Code": "009:020",
+        "Publisher": "Centers for Disease Control and Prevention",
+        "Bureau Code": "009:20",
+        "Public Access Level": "Public Domain"
+      }
+    },
+    "availableDisplayTypes": [
+      "table",
+      "fatrow",
+      "page"
+    ],
+    "renderTypeConfig": {
+      "visible": {
+        "table": true
+      }
+    }
+  },
+  "owner": {
+    "id": "fjjr-gap9",
+    "displayName": "CDC UserSA",
+    "screenName": "CDC UserSA",
+    "type": "interactive",
+    "flags": [
+      "acceptedEula",
+      "mayBeStoriesCoOwner"
+    ]
+  },
+  "query": {},
+  "rights": [
+    "read"
+  ],
+  "tableAuthor": {
+    "id": "fjjr-gap9",
+    "displayName": "CDC UserSA",
+    "screenName": "CDC UserSA",
+    "type": "interactive",
+    "flags": [
+      "acceptedEula",
+      "mayBeStoriesCoOwner"
+    ]
+  },
+  "tags": [
+    "osh",
+    "office on smoking and health",
+    "tax",
+    "tax burden on tobacco",
+    "cigarette sales",
+    "gross cigarette tax revenue per state"
+  ],
+  "flags": [
+    "calculatedView",
+    "ownerMayBeContacted",
+    "restorable",
+    "restorePossibleForType",
+    "soqlBasedView"
+  ]
+}

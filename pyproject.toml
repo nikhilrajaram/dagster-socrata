@@ -6,13 +6,13 @@ readme = "README.md"
 requires-python = ">=3.9,<3.13"
 dependencies = [
     "dagster",
+    "dagster-ncsa",
     "dagster-cloud",
     "sodapy",
     "boto3==1.34.131",
     "dagster-aws",
     "dagster-postgres",
     "deltalake",
-    "pyairtable",
     "pandas",
     "pyarrow",
     "s3fs",
@@ -23,6 +23,7 @@ dependencies = [
 dev = [
     "dagster-webserver", 
     "pytest",
+    "flake8"
 ]
 
 [build-system]
@@ -35,3 +36,7 @@ code_location_name = "dagster_socrata"
 
 [tool.setuptools.packages.find]
 exclude=["dagster_socrata_tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["dagster_socrata_tests"]
+norecursedirs = ["dagster_socrata_tests/integration_tests"]
