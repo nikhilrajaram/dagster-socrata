@@ -2,7 +2,7 @@ import os
 from unittest.mock import MagicMock
 
 from dagster_ncsa import S3ResourceNCSA
-from dagster_socrata.assets import socrata_to_object_store
+from dagster_socrata.assets.objectstore import socrata_to_object_store
 from dagster_socrata_tests.conftest import MOCK_DATASET_ID, MockSocrataResource
 from dagster import build_asset_context, ResourceDefinition
 

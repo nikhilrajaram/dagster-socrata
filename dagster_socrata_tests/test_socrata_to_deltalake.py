@@ -4,14 +4,14 @@ from unittest.mock import MagicMock, patch
 from dagster import ResourceDefinition, build_asset_context
 
 from dagster_ncsa import S3ResourceNCSA
-from dagster_socrata.assets import socrata_to_deltalake
+from dagster_socrata.assets.deltatable import socrata_to_deltalake
 from dagster_socrata_tests.conftest import MOCK_DATASET_ID, MockSocrataResource
 
 
-@patch("dagster_socrata.assets.DeltaTable")
-@patch("dagster_socrata.assets.write_deltalake")
-@patch("dagster_socrata.assets.s3fs.S3FileSystem")
-@patch("dagster_socrata.assets.ds.dataset")
+@patch("dagster_socrata.assets.deltatable.DeltaTable")
+@patch("dagster_socrata.assets.deltatable.write_deltalake")
+@patch("dagster_socrata.assets.deltatable.s3fs.S3FileSystem")
+@patch("dagster_socrata.assets.deltatable.ds.dataset")
 def test_socrata_to_deltalake(
     mock_dataset, mock_s3fs, mock_deltalake, mock_delta_table
 ):

@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 
 from dagster import build_asset_context
-from dagster_socrata.assets import socrata_metadata
+from dagster_socrata.assets.metadata import socrata_metadata
 from dagster_socrata_tests.conftest import MOCK_DATASET_ID, MockSocrataResource
 
 

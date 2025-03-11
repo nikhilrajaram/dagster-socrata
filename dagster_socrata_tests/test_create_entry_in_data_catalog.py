@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 from dagster import build_asset_context, ResourceDefinition
 
 from dagster_ncsa.airtable_catalog_resource import AirTableCatalogResource
-from dagster_socrata.assets import create_entry_in_data_catalog
+from dagster_socrata.assets.catalog import create_entry_in_data_catalog
 from dagster_socrata_tests.conftest import MockSocrataResource
 
 
@@ -23,7 +23,7 @@ def test_create_entry_in_data_catalog():
         resources={
             "airtable": ResourceDefinition.hardcoded_resource(mock_airtable_resource)
         },
-        asset_config={"catalog": "PublicHealth", "schema": "sdoh"},
+        asset_config={"catalog": "PublicHealth", "schema_name": "sdoh"},
     )
 
     create_entry_in_data_catalog(

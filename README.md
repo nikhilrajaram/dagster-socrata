@@ -39,8 +39,28 @@ If you want to enable Dagster [Schedules](https://docs.dagster.io/guides/automat
 
 Once your Dagster Daemon is running, you can start turning on schedules and sensors for your jobs.
 
-## Deploy on Dagster+
 
-The easiest way to deploy your Dagster project is to use Dagster+.
+# Using
+Accessing DeltaTable from DuckDB
 
-Check out the [Dagster+ documentation](https://docs.dagster.io/dagster-plus/) to learn more.
+```sql
+INSTALL httpfs;
+LOAD httpfs;
+
+-- Load the Delta Lake extension
+INSTALL delta;
+LOAD delta;
+
+-- Create an S3 secret for your object store configuration
+CREATE SECRET osn_rice (
+    TYPE S3,
+    ENDPOINT 'rice1.osn.mghpcc.org',
+    USE_SSL true,
+    URL_STYLE path
+);
+
+-- Now you can query your Delta table
+-- Replace 'bucket-name/path/to/delta-table' with your actual path
+SELECT * FROM delta_scan('s3://sdoh-public/delta/data.cdc.gov/jqwm-z2g9');
+
+```
