@@ -60,5 +60,5 @@ jobs:
         file: Dockerfile
         push: true
         tags: |
-          ghcr.io/bengalewsky/dagster-socrata:${{ env.branch }}
-          ghcr.io/bengalewsky/dagster-socrata:latest
+          ghcr.io/ncsa/dagster-socrata:${{ env.branch }}
+          ghcr.io/ncsa/dagster-socrata:latest
