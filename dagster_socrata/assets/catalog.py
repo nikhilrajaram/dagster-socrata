@@ -3,6 +3,7 @@ from datetime import datetime
 from dagster import AssetExecutionContext, Config
 from dagster import AssetIn, asset
 from dagster_ncsa.airtable_catalog_resource import AirTableCatalogResource
+from dagster_ncsa.models import TableEntry
 
 
 class CatalogConfig(Config):
@@ -31,9 +32,9 @@ def create_entry_in_data_catalog(
     :param socrata_to_deltalake:
     :return:
     """
-    airtable.create_table_record(
+    table_entry = TableEntry(
         catalog=config.catalog,
-        schema=config.schema_name,
+        schema_name=config.schema_name,
         table=socrata_metadata.table_name,
         name=socrata_metadata["name"],
         description=socrata_metadata["description"],
@@ -41,3 +42,4 @@ def create_entry_in_data_catalog(
         license_name=socrata_metadata.license,
         pub_date=datetime.fromtimestamp(socrata_metadata["publicationDate"]),
     )
+    airtable.create_table_record(table_entry)
