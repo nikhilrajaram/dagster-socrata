@@ -1,10 +1,10 @@
-from dagster import AssetExecutionContext, Config, asset
+from dagster import AssetExecutionContext, Config, asset, EnvVar
 
 from dagster_socrata.socrata_resource import SocrataMetadata, SocrataResource
 
 
 class SocrataDatasetConfig(Config):
-    dataset_id: str = "vdgb-f9s3"
+    dataset_id: str = EnvVar("SOCRATA_DATASET_ID").get_value()
 
 
 @asset(
